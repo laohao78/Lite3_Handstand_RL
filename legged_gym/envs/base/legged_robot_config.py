@@ -130,8 +130,8 @@ class LeggedRobotCfg(BaseConfig):
     class rewards:
         class scales:
             termination = -0.0
-            tracking_lin_vel = -0.2 #3.0
-            tracking_ang_vel = -0.2 #1.5
+            tracking_lin_vel = -0.5 #3.0
+            tracking_ang_vel = -0.5 #1.5
             lin_vel_z = -0.
             ang_vel_xy = -0.3
             orientation = -0.0
@@ -142,12 +142,21 @@ class LeggedRobotCfg(BaseConfig):
             feet_air_time = 0.0
             collision = -1.
             feet_stumble = -0.0 
-            action_rate = -0.02
+            action_rate = -0.25 #-0.02
             stand_still = -0.3 #0
             handstand_feet_height_exp = 10.0 #10
             handstand_feet_on_air = 2.5 #1.0
             handstand_feet_air_time = 2.5 #1.0
             handstand_orientation_l2 = -0.5
+
+            joint_smoothness = 0.5  # 关节平滑性奖励系数
+            torque_smoothness = 0.3  # 扭矩平滑性奖励系数
+            # action_smoothness = 0.4  # 动作平滑性奖励系数
+        
+        class joint_smoothness_weights:
+            action_rate = 1.0      # 动作变化率权重
+            acceleration = 0.5     # 加速度权重  
+            jerk = 0.2            # 加加速度权重
             
         only_positive_rewards = False # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.2 # tracking reward = exp(-error^2/sigma) 0.25
@@ -250,7 +259,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         policy_class_name = 'ActorCritic'
         algorithm_class_name = 'PPO'
         num_steps_per_env = 24 # per iteration
-        max_iterations = 8000 # number of policy updates
+        max_iterations = 500 # number of policy updates
 
         # logging
         save_interval = 50 # check for potential saves every this many iterations

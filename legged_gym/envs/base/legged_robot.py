@@ -134,6 +134,11 @@ class LeggedRobot(BaseTask):
 
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self._draw_debug_vis()
+            
+        # 确保这些更新在最后执行
+        self.last_actions[:] = self.actions[:]
+        self.last_dof_vel[:] = self.dof_vel[:]
+        self.last_root_vel[:] = self.root_states[:, 7:13]
 
     def check_termination(self):
         """ Check if environments need to be reset
@@ -556,6 +561,9 @@ class LeggedRobot(BaseTask):
                 if self.cfg.control.control_type in ["P", "V"]:
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
+         # 初始化平滑性奖励相关变量
+        self.last_dof_acc = torch.zeros_like(self.dof_vel)
+        self.last_torques = torch.zeros_like(self.torques)
 
     def _prepare_reward_function(self):
         """ Prepares a list of reward functions, whcih will be called to compute the total reward.
@@ -1072,3 +1080,42 @@ class LeggedRobot(BaseTask):
         )
 
         return torch.sum((self.projected_gravity - target_gravity) ** 2, dim=1)
+    def _reward_joint_smoothness(self):
+        """奖励关节运动的平滑性，惩罚剧烈的动作变化"""
+        # 1. 动作变化率惩罚（相邻时间步动作差异）
+        action_rate_penalty = torch.sum(torch.square(self.last_actions - self.actions), dim=1)
+        
+        # 2. 关节加速度惩罚
+        joint_acceleration = (self.dof_vel - self.last_dof_vel) / self.dt
+        joint_accel_penalty = torch.sum(torch.square(joint_acceleration), dim=1)
+        
+        # 3. 关节加加速度（jerk）惩罚 - 更高级的平滑性
+        if hasattr(self, 'last_dof_acc'):
+            joint_jerk = (joint_acceleration - self.last_dof_acc) / self.dt
+            joint_jerk_penalty = torch.sum(torch.square(joint_jerk), dim=1)
+        else:
+            joint_jerk_penalty = torch.zeros_like(action_rate_penalty)
+        
+        # 保存当前加速度供下一帧使用
+        self.last_dof_acc = joint_acceleration.clone()
+        
+        # 组合惩罚项（使用负奖励，因为我们要最小化这些值）
+        smoothness_penalty = (
+            self.cfg.rewards.joint_smoothness_weights.action_rate * action_rate_penalty +
+            self.cfg.rewards.joint_smoothness_weights.acceleration * joint_accel_penalty +
+            self.cfg.rewards.joint_smoothness_weights.jerk * joint_jerk_penalty
+        )
+        
+        return -smoothness_penalty  # 返回负值，因为惩罚项越小越好
+
+    def _reward_torque_smoothness(self):
+        """奖励扭矩变化的平滑性"""
+        if hasattr(self, 'last_torques'):
+            torque_change = torch.sum(torch.square(self.torques - self.last_torques), dim=1)
+        else:
+            torque_change = torch.zeros(self.num_envs, device=self.device)
+        
+        # 保存当前扭矩供下一帧使用
+        self.last_torques = self.torques.clone()
+        
+        return -torque_change
