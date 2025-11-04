@@ -142,7 +142,7 @@ class LeggedRobotCfg(BaseConfig):
             feet_air_time = 0.0
             collision = -1.
             feet_stumble = -0.0 
-            action_rate = -0.25 #-0.02
+            action_rate = -0.3 #-0.02
             stand_still = -0.3 #0
             handstand_feet_height_exp = 10.0 #10
             handstand_feet_on_air = 2.5 #1.0
@@ -150,8 +150,8 @@ class LeggedRobotCfg(BaseConfig):
             handstand_orientation_l2 = -0.5
 
             joint_smoothness = 0.5  # 关节平滑性奖励系数
-            torque_smoothness = 0.3  # 扭矩平滑性奖励系数
-            # action_smoothness = 0.4  # 动作平滑性奖励系数
+            torque_smoothness = 0.5  # 扭矩平滑性奖励系数
+            
         
         class joint_smoothness_weights:
             action_rate = 1.0      # 动作变化率权重
