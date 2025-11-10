@@ -72,8 +72,8 @@ class LeggedRobotCfg(BaseConfig):
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
         class ranges:
-            lin_vel_x = [-1.0, 1.0] # min max [m/s]
-            lin_vel_y = [-1.0, 1.0]   # min max [m/s]
+            lin_vel_x = [-0.0, 0.0] # min max [m/s]
+            lin_vel_y = [-0.0, 0.0]   # min max [m/s]
             ang_vel_yaw = [-1, 1]    # min max [rad/s]
             heading = [-3.14, 3.14]
 
@@ -130,8 +130,8 @@ class LeggedRobotCfg(BaseConfig):
     class rewards:
         class scales:
             termination = -0.0
-            tracking_lin_vel = -0.2 #3.0
-            tracking_ang_vel = -0.2 #1.5
+            tracking_lin_vel = 3.0 #3.0
+            tracking_ang_vel = 1.5 #1.5
             lin_vel_z = -0.
             ang_vel_xy = -0.3
             orientation = -0.0
@@ -144,12 +144,12 @@ class LeggedRobotCfg(BaseConfig):
             feet_stumble = -0.0 
             action_rate = -0.03 #-0.02 这个调的太小可能会非常非常 s
             stand_still = -0.8 #0
-            handstand_feet_height_exp = 18 #10
-            handstand_feet_on_air = 1.5 #1.0
-            handstand_feet_air_time = 1.5 #1.0
+            handstand_feet_height_exp = 17.5 #10
+            handstand_feet_on_air = 1.8 #1.0
+            handstand_feet_air_time = 1.8 #1.0
             handstand_orientation_l2 = 1.
 
-            joint_smoothness = 1e-9  # 关节平滑性奖励系数 这个调的太大可能会非常非常 s
+            joint_smoothness = 2e-9  # 关节平滑性奖励系数 这个调的太大可能会非常非常 s
             torque_smoothness = 0.05  # 扭矩平滑性奖励系数 这个调的太大可能会非常非常 s
             # action_smoothness = 0.4  # 动作平滑性奖励系数
 
@@ -165,10 +165,10 @@ class LeggedRobotCfg(BaseConfig):
             
         only_positive_rewards = False # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.2 # tracking reward = exp(-error^2/sigma) 0.25
-        soft_dof_pos_limit = 1. # percentage of urdf limits, values above this limit are penalized
-        soft_dof_vel_limit = 1.
-        soft_torque_limit = 1.
-        base_height_target = 1.
+        soft_dof_pos_limit = 0.85 # percentage of urdf limits, values above this limit are penalized
+        soft_dof_vel_limit = 0.95
+        soft_torque_limit = 0.9
+        base_height_target = 0.95
         max_contact_force = 100. # forces above this value are penalized
 
     class params:  # 参数单独放在params类中
@@ -264,7 +264,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         policy_class_name = 'ActorCritic'
         algorithm_class_name = 'PPO'
         num_steps_per_env = 24 # per iteration
-        max_iterations = 7000 # number of policy updates
+        max_iterations = 20000 # number of policy updates
 
         # logging
         save_interval = 50 # check for potential saves every this many iterations

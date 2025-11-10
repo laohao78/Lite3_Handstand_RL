@@ -1195,11 +1195,6 @@ class LeggedRobot(BaseTask):
             print(f"    - 安全奖励: {knee_safety_reward[i].item():.3f}")
             print(f"  奖励汇总: 惩罚前={reward_before:.3f}, 惩罚后={reward_after:.3f}")
             
-            # 给出建议
-            if min_front_x < backward_penalty_threshold:  # 有前腿向后伸展
-                print(f"  ⚠️  检测到前腿向后伸展！最靠后前腿X={min_front_x:.3f} < 阈值{backward_penalty_threshold:.3f}")
-            else:
-                print(f"  ✅ 前腿位置良好（无向后伸展）")
                 
             print(f"  {'='*60}")
 
