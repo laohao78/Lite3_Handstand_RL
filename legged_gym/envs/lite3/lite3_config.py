@@ -34,10 +34,10 @@ class Lite3RoughCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.32]  # x,y,z [m]
         default_joint_angles = { # = target angles [rad] when action = 0.0
-            'FL_HipX_joint': 0.02,   # [rad]
-            'HL_HipX_joint': 0.02,   # [rad]
-            'FR_HipX_joint': -0.02,  # [rad]
-            'HR_HipX_joint': -0.02,   # [rad]
+            'FL_HipX_joint': 0.00,   # [rad]
+            'HL_HipX_joint': 0.00,   # [rad]
+            'FR_HipX_joint': 0.00,  # [rad]
+            'HR_HipX_joint': 0.00,   # [rad]
 
             'FL_HipY_joint': -0.77,     # [rad]
             'HL_HipY_joint': -0.77,   # [rad]
@@ -69,10 +69,10 @@ class Lite3RoughCfg( LeggedRobotCfg ):
         self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
   
     class rewards( LeggedRobotCfg.rewards ):
-        soft_dof_pos_limit = 0.9
-        base_height_target = 0.25
+        soft_dof_pos_limit = 0.95
+        base_height_target = 0.36
         class scales( LeggedRobotCfg.rewards.scales ):
-            torques = -0.0002
+            torques = -0.00001
             dof_pos_limits = -10.0
 
 class Lite3RoughCfgPPO( LeggedRobotCfgPPO ):

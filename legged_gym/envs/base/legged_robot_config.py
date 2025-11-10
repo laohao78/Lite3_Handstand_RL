@@ -130,8 +130,8 @@ class LeggedRobotCfg(BaseConfig):
     class rewards:
         class scales:
             termination = -0.0
-            tracking_lin_vel = -0.5 #3.0
-            tracking_ang_vel = -0.5 #1.5
+            tracking_lin_vel = -0.2 #3.0
+            tracking_ang_vel = -0.2 #1.5
             lin_vel_z = -0.
             ang_vel_xy = -0.3
             orientation = -0.0
@@ -142,16 +142,21 @@ class LeggedRobotCfg(BaseConfig):
             feet_air_time = 0.0
             collision = -1.
             feet_stumble = -0.0 
-            action_rate = -0.3 #-0.02
-            stand_still = -0.3 #0
-            handstand_feet_height_exp = 10.0 #10
-            handstand_feet_on_air = 2.5 #1.0
-            handstand_feet_air_time = 2.5 #1.0
-            handstand_orientation_l2 = -0.5
+            action_rate = -0.03 #-0.02 这个调的太小可能会非常非常 s
+            stand_still = -0.8 #0
+            handstand_feet_height_exp = 18 #10
+            handstand_feet_on_air = 1.5 #1.0
+            handstand_feet_air_time = 1.5 #1.0
+            handstand_orientation_l2 = 1.
 
-            joint_smoothness = 0.5  # 关节平滑性奖励系数
-            torque_smoothness = 0.5  # 扭矩平滑性奖励系数
-            
+            joint_smoothness = 1e-9  # 关节平滑性奖励系数 这个调的太大可能会非常非常 s
+            torque_smoothness = 0.05  # 扭矩平滑性奖励系数 这个调的太大可能会非常非常 s
+            # action_smoothness = 0.4  # 动作平滑性奖励系数
+
+
+# 明天再调整吧，投影重力有问题
+            progressive_orientation = 0 #2e-4  # 渐进姿态奖励
+            smooth_transition =0 #2e-7       # 平滑过渡奖励
         
         class joint_smoothness_weights:
             action_rate = 1.0      # 动作变化率权重
@@ -168,11 +173,11 @@ class LeggedRobotCfg(BaseConfig):
 
     class params:  # 参数单独放在params类中
         handstand_feet_height_exp = {
-            "target_height": 0.75,
-            "std": 0.5
+            "target_height": 0.9,
+            "std": 0.4
         }
         handstand_orientation_l2 = {
-            "target_gravity": [-1, 0.0, 0.0]
+            "target_gravity": [1, 0.0, 0.0]
         }
         handstand_feet_air_time = {
             "threshold": 5.0
@@ -259,7 +264,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         policy_class_name = 'ActorCritic'
         algorithm_class_name = 'PPO'
         num_steps_per_env = 24 # per iteration
-        max_iterations = 500 # number of policy updates
+        max_iterations = 7000 # number of policy updates
 
         # logging
         save_interval = 50 # check for potential saves every this many iterations

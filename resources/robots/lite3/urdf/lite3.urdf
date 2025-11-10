@@ -179,8 +179,7 @@
       </geometry>
     </collision> -->
   </link>
-  <joint name="FR_HipX_joint"
-    type="revolute">
+  <joint name="FR_HipX_joint" type="revolute">
     <origin xyz="0.1745 -0.062 0" rpy="0 0 0" />
     <parent link="TORSO" />
     <child link="FR_HIP" />
@@ -290,7 +289,7 @@
   <!--!!!!!!!!!!!! Back Left Leg !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!-->
    <link name="HL_HIP">
     <inertial>
-      <origin xyz="0.010905 -0.012636 0.001051" rpy="0 0 0" />
+      <origin xyz="0.010905 -0.012636 0.00049498" rpy="0 0 0" />
       <mass value="0.550" />
       <inertia ixx="0.0003949" ixy="0" ixz="0" iyy="0.0004028" iyz="0" izz="0.0004472" />
     </inertial>
