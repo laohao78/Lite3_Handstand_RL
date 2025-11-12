@@ -995,19 +995,43 @@ class LeggedRobot(BaseTask):
         ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
         return torch.exp(-ang_vel_error/self.cfg.rewards.tracking_sigma)
 
+    # def _reward_feet_air_time(self):
+    #     # Reward long steps
+    #     # Need to filter the contacts because the contact reporting of PhysX is unreliable on meshes
+    #     contact = self.contact_forces[:, self.feet_indices, 2] > 1.
+    #     contact_filt = torch.logical_or(contact, self.last_contacts) 
+    #     self.last_contacts = contact
+    #     first_contact = (self.feet_air_time > 0.) * contact_filt
+    #     self.feet_air_time += self.dt
+    #     rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1) # reward only on first contact with the ground
+    #     rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1 #no reward for zero command
+    #     self.feet_air_time *= ~contact_filt
+    #     return rew_airTime
+    
     def _reward_feet_air_time(self):
         # Reward long steps
         # Need to filter the contacts because the contact reporting of PhysX is unreliable on meshes
         contact = self.contact_forces[:, self.feet_indices, 2] > 1.
+        
+        # 添加维度检查和调整
+        if contact.shape != self.last_contacts.shape:
+            print(f"Warning: Dimension mismatch - contact: {contact.shape}, last_contacts: {self.last_contacts.shape}")
+            # 自动调整到最小公共维度
+            min_feet = min(contact.shape[1], self.last_contacts.shape[1])
+            contact = contact[:, :min_feet]
+            self.last_contacts = self.last_contacts[:, :min_feet]
+            # 同时调整 feet_air_time 的维度
+            self.feet_air_time = self.feet_air_time[:, :min_feet]
+        
         contact_filt = torch.logical_or(contact, self.last_contacts) 
         self.last_contacts = contact
         first_contact = (self.feet_air_time > 0.) * contact_filt
         self.feet_air_time += self.dt
-        rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1) # reward only on first contact with the ground
-        rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1 #no reward for zero command
+        rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1)
+        rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1
         self.feet_air_time *= ~contact_filt
         return rew_airTime
-    
+
     def _reward_stumble(self):
         # Penalize feet hitting vertical surfaces
         return torch.any(torch.norm(self.contact_forces[:, self.feet_indices, :2], dim=2) >\
@@ -1099,107 +1123,174 @@ class LeggedRobot(BaseTask):
     #     return reward
         
     def _reward_handstand_feet_height_exp(self):
-        """运动学版：通过计算膝盖位置来防止触地，只惩罚前腿向后伸"""
+        """优化版：基于0.022米阈值的抬腿判断"""
         
         # 1. 获取相关刚体索引
         thigh_indices = [2, 6, 10, 14]    # FL_THIGH, FR_THIGH, HL_THIGH, HR_THIGH
         shank_indices = [3, 7, 11, 15]    # FL_SHANK, FR_SHANK, HL_SHANK, HR_SHANK
         foot_indices = [4, 8, 12, 16]     # FL_FOOT, FR_FOOT, HL_FOOT, HR_FOOT
         
-        # 2. 计算膝盖离地高度（关键！）
-        shank_pos = self.rigid_body_pos[:, shank_indices, :]  # 小腿位置（近似膝盖）
-        knee_heights = shank_pos[..., 2]  # 膝盖高度
+        # 2. 计算膝盖离地高度
+        shank_pos = self.rigid_body_pos[:, shank_indices, :]
+        knee_heights = shank_pos[..., 2]
         
         # 膝盖安全高度阈值
-        knee_safe_height = 0.05  # 膝盖离地安全高度
+        knee_safe_height = 0.05
         knee_height_penalty = torch.sum(torch.where(knee_heights < knee_safe_height,
                                                 (knee_safe_height - knee_heights) ** 2, 0.0), dim=1)
-        knee_safety_reward = torch.exp(-knee_height_penalty / 0.05)  # 严格惩罚
+        knee_safety_reward = torch.exp(-knee_height_penalty / 0.05)
         
-        # 3. 前腿脚部高度奖励
+        # 3. 前腿脚部高度奖励 - 关键修改：基于0.022米阈值
         front_foot_indices = [4, 8]
         front_foot_tensor = torch.tensor(front_foot_indices, dtype=torch.long, device=self.rigid_body_pos.device)
         front_foot_pos = self.rigid_body_pos[:, front_foot_tensor, :]
-        front_foot_height = front_foot_pos[..., 2]  # Z轴高度
-        front_foot_x = front_foot_pos[..., 0]       # X轴位置（前后方向）
+        front_foot_height = front_foot_pos[..., 2]
+        front_foot_x = front_foot_pos[..., 0]
         
         target_height = self.cfg.params.handstand_feet_height_exp["target_height"]
-        height_error = torch.sum((front_foot_height - target_height) ** 2, dim=1)
-        height_reward = torch.exp(-height_error / 0.2)
         
-        # 4. 前腿向后伸展惩罚（只针对前腿！）
-        backward_penalty_threshold = 0.0  # X坐标小于0认为是向后伸展
+        # 定义抬腿阈值
+        LIFT_THRESHOLD = 0.025  # 高度大于0.022米才算是抬腿
         
-        # 只计算前腿的向后伸展惩罚
+        # 分别获取左右前腿高度
+        front_left_height = front_foot_height[:, 0]
+        front_right_height = front_foot_height[:, 1]
+        
+        # 判断每条腿的状态
+        left_leg_lifted = front_left_height > LIFT_THRESHOLD  # 左腿是否抬离地面
+        right_leg_lifted = front_right_height > LIFT_THRESHOLD  # 右腿是否抬离地面
+        both_legs_lifted = left_leg_lifted & right_leg_lifted  # 双腿都抬离
+        any_leg_lifted = left_leg_lifted | right_leg_lifted  # 任意腿抬离
+        
+        # 计算实际抬腿高度（只考虑抬离地面的腿）
+        left_lift_amount = torch.clamp(front_left_height - LIFT_THRESHOLD, 0)
+        right_lift_amount = torch.clamp(front_right_height - LIFT_THRESHOLD, 0)
+        total_lift_amount = left_lift_amount + right_lift_amount
+        
+        # 新策略：基于抬腿状态的奖励系统
+        # 1. 基础抬腿奖励（鼓励至少一条腿抬离地面）
+        base_lift_reward = any_leg_lifted.float() * 0.3
+        
+        # 2. 单腿抬高奖励（鼓励抬得更高）
+        single_leg_reward = (
+            torch.max(left_lift_amount, right_lift_amount) / (target_height - LIFT_THRESHOLD)
+        ) * 0.4
+        
+        # 3. 双腿协调奖励（鼓励双腿都抬离地面）
+        both_legs_reward = both_legs_lifted.float() * 0.5
+        min_lift_reward = (
+            torch.min(left_lift_amount, right_lift_amount) / (target_height - LIFT_THRESHOLD)
+        ) * 0.3
+        
+        # 4. 交替模式特别奖励（一条腿抬高，一条腿支撑）
+        alternation_condition = (left_leg_lifted & ~right_leg_lifted) | (~left_leg_lifted & right_leg_lifted)
+        alternation_reward = alternation_condition.float() * 0.4
+        
+        # 5. 目标高度奖励（针对已抬离的腿）
+        lifted_heights = torch.where(any_leg_lifted.unsqueeze(1), front_foot_height, torch.tensor(LIFT_THRESHOLD, device=self.device))
+        height_error = torch.sum((lifted_heights - target_height) ** 2, dim=1)
+        target_reward = torch.exp(-height_error / 0.3) * 0.6
+        
+        # 组合高度奖励
+        height_reward = (
+            base_lift_reward +
+            single_leg_reward + 
+            both_legs_reward +
+            min_lift_reward +
+            alternation_reward +
+            target_reward
+        )
+        
+        # 4. 抬腿不足惩罚（针对应该抬腿但没抬的情况）
+        # 如果机器人的最大高度已经超过阈值，但某条腿还在地上，给予惩罚
+        if hasattr(self, 'max_achieved_height'):
+            should_lift = self.max_achieved_height > LIFT_THRESHOLD * 2  # 如果曾经达到较高高度
+            lift_penalty = torch.where(
+                should_lift & ~both_legs_lifted,
+                (1.0 - both_legs_lifted.float()) * 0.2,  # 惩罚没抬腿的情况
+                0.0
+            )
+        else:
+            lift_penalty = torch.zeros(self.num_envs, device=self.device)
+            self.max_achieved_height = torch.max(front_foot_height, dim=1)[0]
+        
+        # 更新最大高度
+        self.max_achieved_height = torch.max(self.max_achieved_height, torch.max(front_foot_height, dim=1)[0])
+        
+        # 5. 前腿向后伸展惩罚
+        backward_penalty_threshold = 0.0
         backward_penalty = torch.sum(torch.where(front_foot_x < backward_penalty_threshold,
                                             (backward_penalty_threshold - front_foot_x) ** 2, 0.0), dim=1)
+        backward_penalty_reward = torch.exp(-backward_penalty / 0.1)
         
-        # 向后伸展奖励（实际上是惩罚的倒数）
-        backward_penalty_reward = torch.exp(-backward_penalty / 0.1)  # 严格惩罚向后伸展
-        
-        # 5. 后腿稳定性奖励（后腿保持接触提供支撑）
+        # 6. 后腿稳定性奖励
         hind_foot_indices = [12, 16]
         hind_foot_tensor = torch.tensor(hind_foot_indices, dtype=torch.long, device=self.rigid_body_pos.device)
         hind_foot_pos = self.rigid_body_pos[:, hind_foot_tensor, :]
         hind_foot_height = hind_foot_pos[..., 2]
-        
-        # 后腿应该接近地面但不是膝盖触地
-        hind_target_height = 0.05  # 后腿稍微离地
+        hind_target_height = 0.05
         hind_height_error = torch.sum((hind_foot_height - hind_target_height) ** 2, dim=1)
         hind_reward = torch.exp(-hind_height_error / 0.05)
         
-        # 6. 组合奖励：重点惩罚前腿向后伸展
+        # 7. 组合奖励
         combined_reward_before = (
-            knee_safety_reward * 0.1 +           # 膝盖安全（基础保障）
-            height_reward * 0.9 +               # 前腿高度（主要目标）
-            backward_penalty_reward * 0. +      # 前腿向后伸展惩罚（只针对前腿）
-            hind_reward * 0.                     # 后腿稳定性
+            knee_safety_reward * 0.2 +
+            height_reward * 0.8 +
+            backward_penalty_reward * 0. +
+            hind_reward * 0. -
+            lift_penalty  # 抬腿不足惩罚
         )
         
-        # 7. 强惩罚：如果有膝盖明显触地，奖励为0
-        severe_knee_contact = torch.any(knee_heights < 0.05, dim=1)  # 膝盖高度<5cm认为触地
-        
-        # 创建惩罚后的奖励副本
+        # 8. 强惩罚：膝盖触地
+        severe_knee_contact = torch.any(knee_heights < 0.05, dim=1)
         combined_reward = combined_reward_before.clone()
         combined_reward[severe_knee_contact] = 0.0
         
-        # 8. 详细调试信息
+        # 9. 详细调试信息
         for i in range(min(3, severe_knee_contact.shape[0])):
             min_height = knee_heights[i].min().item()
             contact = severe_knee_contact[i].item()
             reward_before = combined_reward_before[i].item()
             reward_after = combined_reward[i].item()
             
-            # 获取前腿高度和位置信息
-            front_left_height = front_foot_height[i, 0].item()  # FL脚高度
-            front_right_height = front_foot_height[i, 1].item()  # FR脚高度
-            front_left_x = front_foot_x[i, 0].item()            # FL脚X位置
-            front_right_x = front_foot_x[i, 1].item()           # FR脚X位置
-            avg_front_height = (front_left_height + front_right_height) / 2
-            avg_front_x = (front_left_x + front_right_x) / 2
-            min_front_x = min(front_left_x, front_right_x)  # 最靠后的前腿
-            
-            # 获取各奖励分量
-            height_error_i = height_error[i].item()
-            height_reward_i = height_reward[i].item()
-            backward_penalty_i = backward_penalty[i].item()
-            backward_reward_i = backward_penalty_reward[i].item()
+            # 获取前腿信息
+            left_height = front_left_height[i].item()
+            right_height = front_right_height[i].item()
+            left_lifted = left_leg_lifted[i].item()
+            right_lifted = right_leg_lifted[i].item()
+            left_lift_amt = left_lift_amount[i].item()
+            right_lift_amt = right_lift_amount[i].item()
             
             print(f"环境{i}: 最低膝高={min_height:.3f}, 触地={contact}")
-            print(f"  前腿高度: FL={front_left_height:.3f}, FR={front_right_height:.3f}, 平均={avg_front_height:.3f}, 目标={target_height:.3f}")
-            print(f"  前腿位置: FL_X={front_left_x:.3f}, FR_X={front_right_x:.3f}, 平均={avg_front_x:.3f}, 最靠后={min_front_x:.3f}")
-            print(f"  向后伸展阈值: X<{backward_penalty_threshold:.3f} 会受惩罚")
+            print(f"  抬腿状态 (阈值={LIFT_THRESHOLD:.3f}m):")
+            print(f"    - 左腿: 高度={left_height:.3f}m, 抬腿={left_lifted}, 抬升量={left_lift_amt:.3f}m")
+            print(f"    - 右腿: 高度={right_height:.3f}m, 抬腿={right_lifted}, 抬升量={right_lift_amt:.3f}m")
+            print(f"    - 状态: 单腿抬离={any_leg_lifted[i].item()}, 双腿抬离={both_legs_lifted[i].item()}")
+            
             print(f"  奖励分量:")
-            print(f"    - 高度奖励: 误差={height_error_i:.4f}, 奖励={height_reward_i:.3f}")
-            print(f"    - 前腿向后伸展惩罚: 惩罚值={backward_penalty_i:.4f}, 奖励={backward_reward_i:.3f}")
-            print(f"    - 安全奖励: {knee_safety_reward[i].item():.3f}")
+            print(f"    - 基础抬腿: {base_lift_reward[i].item():.3f}")
+            print(f"    - 单腿抬高: {single_leg_reward[i].item():.3f}")
+            print(f"    - 双腿协调: {both_legs_reward[i].item():.3f}")
+            print(f"    - 最小抬腿: {min_lift_reward[i].item():.3f}")
+            print(f"    - 交替模式: {alternation_reward[i].item():.3f}")
+            print(f"    - 目标奖励: {target_reward[i].item():.3f}")
+            print(f"    - 抬腿惩罚: -{lift_penalty[i].item():.3f}")
+            
             print(f"  奖励汇总: 惩罚前={reward_before:.3f}, 惩罚后={reward_after:.3f}")
             
+            # 给出行为建议
+            if not left_lifted and not right_lifted:
+                print(f"  💡 建议: 两条腿都还在地上，尝试抬起至少一条腿")
+            elif left_lifted and not right_lifted:
+                print(f"  💡 建议: 左腿已抬起，可以尝试抬起右腿或继续抬高左腿")
+            elif not left_lifted and right_lifted:
+                print(f"  💡 建议: 右腿已抬起，可以尝试抬起左腿或继续抬高右腿")
+            else:
+                print(f"  💡 建议: 双腿都已抬起！继续向目标高度{target_height:.2f}m努力")
                 
             print(f"  {'='*60}")
 
         return combined_reward
-
     # def _reward_handstand_feet_height_exp(self):
     #     feet_indices = [i for i, name in enumerate(self.rigid_body_names) if re.match(self.cfg.params.feet_name_reward["feet_name"], name)]
     #     # print(feet_indices)
