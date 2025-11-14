@@ -45,9 +45,9 @@ def play(args):
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 50)
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
-    env_cfg.terrain.curriculum = False
-    env_cfg.noise.add_noise = False
-    env_cfg.domain_rand.randomize_friction = False
+    env_cfg.terrain.curriculum = True # 课程学习 改了一下 false --> true
+    env_cfg.noise.add_noise = False # 传感器噪声
+    env_cfg.domain_rand.randomize_friction = False # 随机化
     env_cfg.domain_rand.push_robots = False
     
 
@@ -76,9 +76,11 @@ def play(args):
     camera_vel = np.array([1., 1., 0.])
     camera_direction = np.array(env_cfg.viewer.lookat) - np.array(env_cfg.viewer.pos)
     img_idx = 0
-    # env.commands[:,0]=0.0
-    # env.commands[:,1]=0.0
-    # env.commands[:,2]=0.0
+    
+    env.commands[:,0]=.0 # 改了一下 注释 --> 取消注释
+    env.commands[:,1]=.0 # 改了一下 注释 --> 取消注释
+    env.commands[:,2]=.0 # 改了一下 注释 --> 取消注释
+    
     for i in range(10*int(env.max_episode_length)):
         actions = policy(obs.detach())
         obs, _, rews, dones, infos = env.step(actions.detach())

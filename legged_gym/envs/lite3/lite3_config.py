@@ -34,10 +34,10 @@ class Lite3RoughCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.32]  # x,y,z [m]
         default_joint_angles = { # = target angles [rad] when action = 0.0
-            'FL_HipX_joint': 0.00,   # [rad]
-            'HL_HipX_joint': 0.00,   # [rad]
-            'FR_HipX_joint': 0.00,  # [rad]
-            'HR_HipX_joint': 0.00,   # [rad]
+            'FL_HipX_joint': 0.02,   # [rad]
+            'HL_HipX_joint': 0.02,   # [rad]
+            'FR_HipX_joint': 0.02,  # [rad]
+            'HR_HipX_joint': 0.02,   # [rad]
 
             'FL_HipY_joint': -0.77,     # [rad]
             'HL_HipY_joint': -0.77,   # [rad]

@@ -66,16 +66,16 @@ class LeggedRobotCfg(BaseConfig):
         slope_treshold = 0.75 # slopes above this threshold will be corrected to vertical surfaces
 
     class commands:
-        curriculum = False
-        max_curriculum = 1.
-        num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
-        resampling_time = 10. # time before command are changed[s]
-        heading_command = True # if true: compute ang vel command from heading error
+        curriculum = True # 是否启用课程学习，如果为 True，会从简单的命令开始（如小速度），逐渐增加难度
+        max_curriculum = 1. # 表示最大难度系数，用于缩放命令范围
+        num_commands = 4 # 命令的维度数量 default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
+        resampling_time = 10. # time before command are changed[s] 每10秒重新生成一次命令
+        heading_command = False # if true: compute ang vel command from heading error 使用朝向误差计算角速度
         class ranges:
-            lin_vel_x = [-0.05, 0.05] # min max [m/s]
-            lin_vel_y = [-0.05, 0.05]   # min max [m/s]
+            lin_vel_x = [-0.7, 0.7] # min max [m/s]
+            lin_vel_y = [-0.7, 0.7]   # min max [m/s]
             ang_vel_yaw = [-1, 1]    # min max [rad/s]
-            heading = [-3.14, 3.14]
+            heading = [-3.14, 3.14] # 朝向
 
     class init_state:
         pos = [0.0, 0.0, 1.] # x,y,z [m]
@@ -130,8 +130,8 @@ class LeggedRobotCfg(BaseConfig):
     class rewards:
         class scales:
             termination = -0.0
-            tracking_lin_vel = 1.5 #3.0
-            tracking_ang_vel = 0.5 #1.5
+            tracking_lin_vel = 10. #3.0
+            tracking_ang_vel = 5 #1.5
             lin_vel_z = -0.
             ang_vel_xy = -0.3
             orientation = -0.0
@@ -144,7 +144,7 @@ class LeggedRobotCfg(BaseConfig):
             feet_stumble = -0.0 
             action_rate = -0.03 #-0.02 这个调的太小可能会非常非常 s
             stand_still = -0.8 #0
-            handstand_feet_height_exp = 17 #10
+            handstand_feet_height_exp = 17.5 #10
             handstand_feet_on_air = 1.5 #1.0
             handstand_feet_air_time = 1.5 #1.0
             handstand_orientation_l2 = 0.8
@@ -153,7 +153,7 @@ class LeggedRobotCfg(BaseConfig):
             # action_smoothness = 0.4  # 动作平滑性奖励系数
 
 
-# 明天再调整吧，投影重力有问题
+            # 不调整了，投影重力有问题，这两项不加也没事
             progressive_orientation = 0 #2e-4  # 渐进姿态奖励
             smooth_transition =0 #2e-7       # 平滑过渡奖励
         
@@ -263,7 +263,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         policy_class_name = 'ActorCritic'
         algorithm_class_name = 'PPO'
         num_steps_per_env = 24 # per iteration
-        max_iterations = 20000 # number of policy updates
+        max_iterations = 25000 # number of policy updates
 
         # logging
         save_interval = 50 # check for potential saves every this many iterations
