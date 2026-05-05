@@ -181,7 +181,7 @@ def export_policy_as_onnx(actor_critic):
     model = copy.deepcopy(actor_critic.actor).to('cpu')
     actor_input = torch.randn(1, 45)  # 根据实际情况调整形状
 
-    body_onnx_path = '/home/bai/legged_gym_handstand/logs/onnx/' + 'legged.onnx'
+    body_onnx_path = '/root/gpufree-data/Legged_gym_handstand-for-DeepRobotics-JueYing-Lite3/logs/onnx/legged.onnx'
     paths = [body_onnx_path]
     for path in paths:
         if os.path.exists(path):

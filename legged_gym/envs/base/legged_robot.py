@@ -1137,7 +1137,8 @@ class LeggedRobot(BaseTask):
         # 膝盖安全高度阈值
         knee_safe_height = 0.05
         knee_height_penalty = torch.sum(torch.where(knee_heights < knee_safe_height,
-                                                (knee_safe_height - knee_heights) ** 2, 0.0), dim=1)
+                                            (knee_safe_height - knee_heights) ** 2, 
+                                            torch.tensor(0.0, dtype=torch.float32, device=self.device)), dim=1)
         knee_safety_reward = torch.exp(-knee_height_penalty / 0.05)
         
         # 3. 前腿脚部高度奖励 - 关键修改：基于0.022米阈值
@@ -1205,10 +1206,12 @@ class LeggedRobot(BaseTask):
         # 如果机器人的最大高度已经超过阈值，但某条腿还在地上，给予惩罚
         if hasattr(self, 'max_achieved_height'):
             should_lift = self.max_achieved_height > LIFT_THRESHOLD * 2  # 如果曾经达到较高高度
+            penalty_scale = front_foot_height.new_tensor(0.2)
+            zero_penalty = front_foot_height.new_tensor(0.0)
             lift_penalty = torch.where(
                 should_lift & ~both_legs_lifted,
-                (1.0 - both_legs_lifted.float()) * 0.2,  # 惩罚没抬腿的情况
-                0.0
+                (1.0 - both_legs_lifted.float()) * penalty_scale,
+                zero_penalty,
             )
         else:
             lift_penalty = torch.zeros(self.num_envs, device=self.device)
@@ -1218,9 +1221,16 @@ class LeggedRobot(BaseTask):
         self.max_achieved_height = torch.max(self.max_achieved_height, torch.max(front_foot_height, dim=1)[0])
         
         # 5. 前腿向后伸展惩罚
-        backward_penalty_threshold = 0.0
-        backward_penalty = torch.sum(torch.where(front_foot_x < backward_penalty_threshold,
-                                            (backward_penalty_threshold - front_foot_x) ** 2, 0.0), dim=1)
+        backward_penalty_threshold = front_foot_x.new_tensor(0.0)
+        zero_penalty = front_foot_x.new_tensor(0.0)
+        backward_penalty = torch.sum(
+            torch.where(
+                front_foot_x < backward_penalty_threshold,
+                (backward_penalty_threshold - front_foot_x) ** 2,
+                zero_penalty,
+            ),
+            dim=1,
+        )
         backward_penalty_reward = torch.exp(-backward_penalty / 0.1)
         
         # 6. 后腿稳定性奖励
@@ -1352,6 +1362,15 @@ class LeggedRobot(BaseTask):
                 (~knee_contact).float().prod(dim=1))
         
         return reward
+
+    def _reward_handstand_front_feet_contact(self):
+        """直接惩罚前脚接触地面，帮助后腿倒立行走时抑制前腿落地。"""
+        # 这里只统计前脚的接触次数，接触越多，奖励越低。
+        front_foot_indices = [i for i, name in enumerate(self.rigid_body_names)
+                              if re.match(self.cfg.params.feet_name_reward["feet_name"], name)]
+        front_foot_tensor = torch.tensor(front_foot_indices, dtype=torch.long, device=self.device)
+        front_foot_contact = torch.norm(self.contact_forces[:, front_foot_tensor, :], dim=-1) > 1.0
+        return torch.sum(front_foot_contact.float(), dim=1)
     
     def _reward_handstand_feet_air_time(self):
         """

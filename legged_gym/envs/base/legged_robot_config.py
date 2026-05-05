@@ -148,6 +148,8 @@ class LeggedRobotCfg(BaseConfig):
             handstand_feet_on_air = 1.5 #1.0
             handstand_feet_air_time = 1.5 #1.0
             handstand_orientation_l2 = 0.8
+            # 前脚一旦接触地面就给予较强惩罚，避免训练时前腿反复落地。
+            front_feet_contact = -20.0
             joint_smoothness = 2.5e-9  # 关节平滑性奖励系数 这个调的太大可能会非常非常 s
             torque_smoothness = 0.06  # 扭矩平滑性奖励系数 这个调的太大可能会非常非常 s
             # action_smoothness = 0.4  # 动作平滑性奖励系数
