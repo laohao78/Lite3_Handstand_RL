@@ -1363,11 +1363,11 @@ class LeggedRobot(BaseTask):
         
         return reward
 
-    def _reward_handstand_front_feet_contact(self):
+    def _reward_front_feet_contact(self):
         """直接惩罚前脚接触地面，帮助后腿倒立行走时抑制前腿落地。"""
         # 这里只统计前脚的接触次数，接触越多，奖励越低。
         front_foot_indices = [i for i, name in enumerate(self.rigid_body_names)
-                              if re.match(self.cfg.params.feet_name_reward["feet_name"], name)]
+                              if name.startswith("FL_") or name.startswith("FR_")]
         front_foot_tensor = torch.tensor(front_foot_indices, dtype=torch.long, device=self.device)
         front_foot_contact = torch.norm(self.contact_forces[:, front_foot_tensor, :], dim=-1) > 1.0
         return torch.sum(front_foot_contact.float(), dim=1)
