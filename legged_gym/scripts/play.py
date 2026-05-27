@@ -49,6 +49,13 @@ def play(args):
     env_cfg.noise.add_noise = False # 传感器噪声
     env_cfg.domain_rand.randomize_friction = False # 随机化
     env_cfg.domain_rand.push_robots = False
+    # 可选静态效果：关闭命令变化并将所有命令采样范围固定为 0
+    if args.static_cmd:
+        env_cfg.commands.resampling_time = 1e9
+        env_cfg.commands.ranges.lin_vel_x = [0.0, 0.0]
+        env_cfg.commands.ranges.lin_vel_y = [0.0, 0.0]
+        env_cfg.commands.ranges.ang_vel_yaw = [0.0, 0.0]
+        env_cfg.commands.ranges.heading = [0.0, 0.0]
     
 
     # prepare environment
@@ -77,9 +84,10 @@ def play(args):
     camera_direction = np.array(env_cfg.viewer.lookat) - np.array(env_cfg.viewer.pos)
     img_idx = 0
     
-    env.commands[:,0]=.0 # 改了一下 注释 --> 取消注释
-    env.commands[:,1]=.0 # 改了一下 注释 --> 取消注释
-    env.commands[:,2]=.0 # 改了一下 注释 --> 取消注释
+    if args.static_cmd:
+        env.commands[:,0]=.0 # 改了一下 注释 --> 取消注释
+        env.commands[:,1]=.0 # 改了一下 注释 --> 取消注释
+        env.commands[:,2]=.0 # 改了一下 注释 --> 取消注释
     
     for i in range(10*int(env.max_episode_length)):
         actions = policy(obs.detach())

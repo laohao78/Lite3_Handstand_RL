@@ -64,7 +64,7 @@ class Lite3RoughCfg( LeggedRobotCfg ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/lite3/urdf/lite3.urdf'
         name = "lite3"
         foot_name = "FOOT" 
-        penalize_contacts_on = ["SHANK", "THIGH","Knee"]
+        penalize_contacts_on = ["SHANK", "THIGH", "HIP"]
         terminate_after_contacts_on = ["TORSO"]
         self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
   

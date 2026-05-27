@@ -37,8 +37,14 @@ mkdir -p /root/gpufree-data/Legged_gym_handstand-for-DeepRobotics-JueYing-Lite3/
 cd Legged_gym_handstand-for-DeepRobotics-JueYing-Lite3/legged_gym/scripts
 export LD_LIBRARY_PATH=/opt/conda/envs/myenv/lib:$LD_LIBRARY_PATH
 python play.py --task=lite3
+python play.py --task=lite3 --static_cmd
 # 格式：指定 task + 运行日志文件夹 + 检查点编号
-python play.py --task=lite3 --load_run=May04_15-43-59_ --checkpoint=0
+python play.py --task=lite3 --load_run=May04_18-05-31_ --checkpoint=3500
+python play.py --task=lite3 --load_run=May05_12-57-29_ --checkpoint=1500
+python play.py --task=lite3 --load_run=May05_14-33-51_ --checkpoint=3500
+# 卡死了
+ps aux | grep python
+pkill -f "play.py --task=lite3"
 ```
 # 03.tensorboard
 ```sh
