@@ -58,3 +58,4 @@ runs
 # other
 *.egg-info
 __pycache__
+docs/socratic-*
